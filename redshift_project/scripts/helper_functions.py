@@ -89,35 +89,52 @@ def plot_spectrum(filename, wave_range=None, fig=None, ax=None):
 
 # Define a Gaussian function for fitting
 # A Gaussian is also the bell curve
-def gaussian(x, amp, cen, wid, offset):
-  """
-  x : an array of wavelengths
-  amp : amplitude of the Gaussian
-  cen : center of the Gaussian (mean)
-  wid : width of the Gaussian (standard deviation)
-  offset : vertical offset of the Gaussian
+def gaussian(x, amp, cen, wid, m, b):
+    """
+    x : an array of wavelengths
+    amp : amplitude of the Gaussian
+    cen : center of the Gaussian (mean)
+    wid : width of the Gaussian (standard deviation)
+    offset : vertical offset of the Gaussian
 
-  Returns the Gaussian array.
-  """
-  return amp * np.exp(-(x-cen)**2 / (2*wid**2)) + offset
+    Returns the Gaussian array.
+    """
+    return amp * np.exp(-(x-cen)**2 / (2*wid**2)) + (m*x + b)
 
 
 # Pre-made function to fit Gaussian profile to an emission line
 def fit_gaussian(filename, wave_range=[4980, 5020]):
-  wave, flux = read_spectrum(filename)
+    wave, flux = read_spectrum(filename)
 
-  wave_min, wave_max = wave_range
-  # Create a mask to isolate the wavelength region
-  mask = (wave >= wave_min) & (wave <= wave_max)
-  # Apply the mask to the wavelength and flux arrays
-  wave, flux = wave[mask], flux[mask]
+    wave_min, wave_max = wave_range
+    # Create a mask to isolate the wavelength region
+    mask = (wave >= wave_min) & (wave <= wave_max)
+    # Apply the mask to the wavelength and flux arrays
+    wave, flux = wave[mask], flux[mask]
 
-  # Fit a Gaussian profile to the emission line
-  p0 = [1, 500, 10, 0]  # Initial guess for the parameters
-  fit, cov = curve_fit(gaussian, wave, flux, p0=p0)
-  # fit contains the best-fit parameters (amp, cen, wid, offset)
-  # cov is the "covariance" of the fit
-  # We can turn cov into the "error" of the fit like this:
-  fit_err = np.sqrt(np.diag(cov))
+    # Normalize the flux to the mean value
+    try:
+        norm = np.nanmean(flux)
+    except ValueError:
+        # If the flux is empty, continue
+        print(f"Warning: No valid flux data in the range {wave_range}.")
+        return np.full(5, np.nan), np.full(5, np.nan)
+    flux = flux / norm
 
-  return fit, fit_err
+    # Fit a Gaussian profile to the emission line
+    p0 = [np.nansum(flux)*np.diff(wave)[0], np.mean(wave_range), 10, 0, 0]  # Initial guess for the parameters
+    fit, cov = curve_fit(gaussian, wave, flux, p0=p0)
+    # fit contains the best-fit parameters (amp, cen, wid, offset)
+    # cov is the "covariance" of the fit
+    # We can turn cov into the "error" of the fit like this:
+    fit_err = np.sqrt(np.diag(cov))
+
+    # Unnormalize the fit parameters
+    fit[0] *= norm  
+    fit[3] *= norm  
+    fit[4] *= norm
+    fit_err[0] *= norm  
+    fit_err[3] *= norm  
+    fit_err[4] *= norm
+
+    return fit, fit_err
