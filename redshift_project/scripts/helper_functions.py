@@ -89,7 +89,7 @@ def plot_spectrum(filename, wave_range=None, fig=None, ax=None):
 
 # Define a Gaussian function for fitting
 # A Gaussian is also the bell curve
-def gaussian(x, amp, cen, wid, m, b):
+def gaussian(x, amp, cen, wid, offset):
     """
     x : an array of wavelengths
     amp : amplitude of the Gaussian
@@ -99,7 +99,7 @@ def gaussian(x, amp, cen, wid, m, b):
 
     Returns the Gaussian array.
     """
-    return amp * np.exp(-(x-cen)**2 / (2*wid**2)) + (m*x + b)
+    return amp * np.exp(-(x-cen)**2 / (2*wid**2)) + offset
 
 
 # Pre-made function to fit Gaussian profile to an emission line
@@ -112,29 +112,20 @@ def fit_gaussian(filename, wave_range=[4980, 5020]):
     # Apply the mask to the wavelength and flux arrays
     wave, flux = wave[mask], flux[mask]
 
-    # Normalize the flux to the mean value
-    try:
-        norm = np.nanmean(flux)
-    except ValueError:
-        # If the flux is empty, continue
-        print(f"Warning: No valid flux data in the range {wave_range}.")
-        return np.full(5, np.nan), np.full(5, np.nan)
-    flux = flux / norm
-
     # Fit a Gaussian profile to the emission line
-    p0 = [np.nansum(flux)*np.diff(wave)[0], np.mean(wave_range), 10, 0, 0]  # Initial guess for the parameters
+    # p0 is the initial guess for the parameters: [amplitude, center, width, offset]
+    amplitude_guess = 10 * np.median(flux)
+    try:
+        center_guess = wave[np.argmax(flux)]
+    except ValueError:
+        center_guess = np.mean(wave)
+    width_guess = 10  # This is a guess, you might need to adjust it
+    offset_guess = 0  # Assuming no offset for simplicity
+    p0 = [amplitude_guess, center_guess, width_guess, offset_guess]  # Initial guess for the parameters
     fit, cov = curve_fit(gaussian, wave, flux, p0=p0)
     # fit contains the best-fit parameters (amp, cen, wid, offset)
     # cov is the "covariance" of the fit
     # We can turn cov into the "error" of the fit like this:
     fit_err = np.sqrt(np.diag(cov))
-
-    # Unnormalize the fit parameters
-    fit[0] *= norm  
-    fit[3] *= norm  
-    fit[4] *= norm
-    fit_err[0] *= norm  
-    fit_err[3] *= norm  
-    fit_err[4] *= norm
 
     return fit, fit_err
