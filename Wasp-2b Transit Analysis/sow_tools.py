@@ -40,14 +40,12 @@ def mask_bad_pix(im, inst="NickelDIC", Nsig=7, thr_min=0.25):
     #thresh[thresh > thr_min] = thr_min
     # Find all pixels in im that exceed thresh relative to neighbors.
     diff = np.abs(nebMeanArr - im) - thresh
-    whb = np.where(diff > 0.)
-    # Replace all "bad" pixels with NaN.
-    im[whb] = np.nan
+    im = np.where(diff > 0., np.nan, im) # Replace all "bad" pixels with NaN.
     
     # Mask known bad pixels according to instrument specified.
     if inst=="NickelDIC":
         im[:, (256, 783, 784)] = np.nan
     
-    print ("%d bad pixels (%.1f%%) marked as NaN (not counting known bad pixels)" % (whb[0].shape[0], 100*whb[0].shape[0]/float(im.size)))
+    # print ("%d bad pixels (%.1f%%) marked as NaN (not counting known bad pixels)" % (whb[0].shape[0], 100*whb[0].shape[0]/float(im.size)))
     
     return im
